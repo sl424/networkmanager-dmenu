@@ -434,9 +434,16 @@ def create_eth_actions(eths, active):
     (activate/deactivate) for Ethernet connections.
 
     """
-    active_eths = [i for i in active if 'ethernet' in i.get_connection_type()]
+    active_eths = [i for i in active if '802-3-ethernet' in i.get_connection_type()]
     return _create_vpngsm_actions(eths, active_eths, "Eth")
 
+def create_wifi_actions(wifis, active):
+    """Create the list of strings to display with associated function
+    (activate/deactivate) for Ethernet connections.
+
+    """
+    active_wifis = [i for i in active if '802-11-wireless' in i.get_connection_type()]
+    return _create_vpngsm_actions(wifis, active_wifis, "WiFi")
 
 def create_gsm_actions(gsms, active):
     """Create the list of strings to display with associated function
@@ -469,7 +476,7 @@ def _create_vpngsm_actions(cons, active_cons, label):
     actions = []
     for con in cons:
         is_active = con.get_id() in active_con_ids
-        action_name = f"{con.get_id()}:{label}"
+        action_name = f"{con.get_id()}({label})"
         if is_active:
             active_connection = [a for a in active_cons
                                  if a.get_id() == con.get_id()]
@@ -494,11 +501,12 @@ def create_wwan_actions(client):
     return [Action(f"{wwan_action} WWAN", toggle_wwan, not wwan_enabled)]
 
 
-def combine_actions(eths, aps, vpns, wgs, gsms, blues, wwan, others, saved):
+def combine_actions(wifis, eths, aps, vpns, wgs, gsms, blues, wwan, others, saved):
     # pylint: disable=too-many-arguments
     """Combine all given actions into a list of actions.
 
-    Args: args - eths: list of Actions
+    Args: args - wifis: list of Actions
+                 eths: list of Actions
                  aps: list of Actions
                  vpns: list of Actions
                  gsms: list of Actions
@@ -509,6 +517,7 @@ def combine_actions(eths, aps, vpns, wgs, gsms, blues, wwan, others, saved):
     compact = CONF.getboolean("dmenu", "compact", fallback=False)
     empty_action = [Action('', None)] if not compact else []
     all_actions = []
+    all_actions += wifis + empty_action if wifis else []
     all_actions += eths + empty_action if eths else []
     all_actions += aps + empty_action if aps else []
     all_actions += vpns + empty_action if vpns else []
@@ -876,11 +885,14 @@ def run():  # pylint: disable=too-many-locals
         # Workaround for older versions of python-gobject with no wireguard support
         wgs = []
     eths = [i for i in CONNS if i.is_type(NM.SETTING_WIRED_SETTING_NAME)]
+    wifis = [i for i in CONNS if i.is_type(NM.SETTING_WIRELESS_SETTING_NAME)]
     blues = [i for i in CONNS if i.is_type(NM.SETTING_BLUETOOTH_SETTING_NAME)]
+    #notify(f"blue has {len(eths)}")
 
     vpn_actions = create_vpn_actions(vpns, active)
     wg_actions = create_wireguard_actions(wgs, active)
     eth_actions = create_eth_actions(eths, active)
+    wifi_actions = create_wifi_actions(wifis, active)
     blue_actions = create_blue_actions(blues, active)
     other_actions = create_other_actions(CLIENT)
     wwan_installed = is_installed("ModemManager")
@@ -899,7 +911,7 @@ def run():  # pylint: disable=too-many-locals
     else:
         saved_actions = [Action("Saved connections", prompt_saved, [saved_cons])]
 
-    actions = combine_actions(eth_actions, ap_actions, vpn_actions, wg_actions,
+    actions = combine_actions(wifi_actions, eth_actions, ap_actions, vpn_actions, wg_actions,
                               gsm_actions, blue_actions, wwan_actions,
                               other_actions, saved_actions)
     sel = get_selection(actions)
